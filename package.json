@@ -1,0 +1,27 @@
+{
+  "name": "label-stale-pull-requests",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "ncc build src/action.js -o dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xCaso/label-stale-pull-requests.git"
+  },
+  "keywords": [],
+  "author": "Matteo Casonato",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/0xCaso/label-stale-pull-requests/issues"
+  },
+  "homepage": "https://github.com/0xCaso/label-stale-pull-requests#readme",
+  "dependencies": {
+    "@actions/core": "^1.10.0",
+    "@actions/github": "^5.1.1",
+    "@vercel/ncc": "^0.36.0"
+  }
+}

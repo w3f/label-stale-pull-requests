@@ -1,0 +1,23 @@
+name: 'Label Stale Pull Requests'
+description: 'Puts the "stale" or "to close" labels to PRs'
+author: 'Matteo Casonato'
+
+inputs:
+  context:
+    description: 'The workflow context'
+    required: true
+  token:
+    description: 'The GitHub token'
+    required: true
+  stale-timeout:
+    description: 'Number of days of inactivity before a PR is considered stale'
+    required: false
+    default: '14'
+
+outputs:
+  message:
+    description: 'The message that was logged'
+
+runs:
+  using: 'node16'
+  main: 'dist/index.js'
