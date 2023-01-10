@@ -9,4 +9,3 @@ This GitHub action puts the "stale" label to PRs that has been inactive for at l
 
 ## Outputs
 - `message`: the message that will be displayed in the action log.
-- 
