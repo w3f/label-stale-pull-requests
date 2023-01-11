@@ -9716,7 +9716,7 @@ async function run() {
             stale_message = stale_message.slice(0, -2)
         }
         const message =
-            `DELAYED APPS REPORT:` + '\n' +
+            `STALE REPORT (${repo_name}):` + '\n' +
             `--------------------` + '\n' +
             `${to_close_message}` +
             `${stale_message}`
@@ -9726,5 +9726,6 @@ async function run() {
 }
 
 run();
+
 })();
 
