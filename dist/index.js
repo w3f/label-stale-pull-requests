@@ -9666,7 +9666,20 @@ async function run() {
             return label.name === "stale"
         }).length > 0;
         if (!isToClose) {
-            let deadline = new Date(pr.updated_at)
+            let latest_comment_date = null;
+            let comments = (await octokit.rest.issues.listComments({
+                issue_number: pr.number,
+                owner: repo_owner,
+                repo: repo_name,
+                per_page: results_per_page
+            })).data;
+            if (comments.length) {
+                comments = comments.filter(comment => !(comment.user.login == "Polkadot-Forum" && comment.user.type == "Bot"));
+                let created_ats = comments.map(comment => comment.created_at);
+                latest_comment_date = created_ats.reduce((a, b) => a > b ? a : b);
+                console.log(latest_comment_date, "||", pr.updated_at, "||", latest_comment_date == pr.updated_at, "||", pr.number)
+            }
+            let deadline = new Date(latest_comment_date || pr.updated_at)
             deadline.setDate(deadline.getDate() + staleTimeout);
             if (today > deadline) {
                 if (isStale) {
