@@ -54,7 +54,6 @@ async function run() {
                 comments = comments.filter(comment => !(comment.user.login == "Polkadot-Forum" && comment.user.type == "Bot"));
                 let created_ats = comments.map(comment => comment.created_at);
                 latest_comment_date = created_ats.reduce((a, b) => a > b ? a : b);
-                console.log(latest_comment_date, "||", pr.updated_at, "||", latest_comment_date == pr.updated_at, "||", pr.number)
             }
             let deadline = new Date(latest_comment_date || pr.updated_at)
             deadline.setDate(deadline.getDate() + staleTimeout);
