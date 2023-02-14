@@ -1,14 +1,17 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+// choose between deliveries or applications
+import * as context from './context.applications.test.json' assert { type: "json" };
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 async function run() {
     const staleTimeout = parseInt(core.getInput('stale-timeout'));
-    const context = core.getInput('context');
-    const context_json = JSON.parse(context);
+    const context_json = context.default;
     const repo = context_json.repository;
     const repo_owner = repo.split("/")[0];
     const repo_name = repo.split("/")[1];
-    const token = core.getInput('token');
+    const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
     const results_per_page = 100; // the max possible value
 
@@ -42,7 +45,7 @@ async function run() {
         const isStale = pr.labels.filter(function (label) {
             return label.name === "stale"
         }).length > 0;
-        if (!isToClose) {
+        if (true) {
             let latest_comment_date = null;
             let comments = (await octokit.rest.issues.listComments({
                 issue_number: pr.number,
@@ -70,31 +73,32 @@ async function run() {
                 }
             }
             let deadline = new Date(latest_comment_date || pr.updated_at)
+            console.log("PR #" + pr.number + " latest event: " + deadline);
             deadline.setDate(deadline.getDate() + staleTimeout);
-            if (today > deadline) {
+            if (false) {
                 if (isStale) {
                     core.debug(`Adding "to close" label to PR #${pr.number}`);
-                    await octokit.rest.issues.removeLabel({
-                        issue_number: pr.number,
-                        owner: repo_owner,
-                        repo: repo_name,
-                        name: "stale"
-                    })
-                    await octokit.rest.issues.addLabels({
-                        issue_number: pr.number,
-                        owner: repo_owner,
-                        repo: repo_name,
-                        labels: ["to close"]
-                    })
+                    // await octokit.rest.issues.removeLabel({
+                    //     issue_number: pr.number,
+                    //     owner: repo_owner,
+                    //     repo: repo_name,
+                    //     name: "stale"
+                    // })
+                    // await octokit.rest.issues.addLabels({
+                    //     issue_number: pr.number,
+                    //     owner: repo_owner,
+                    //     repo: repo_name,
+                    //     labels: ["to close"]
+                    // })
                     to_close.push(pr.number)
                 } else {
                     core.debug(`Adding "stale" label to PR #${pr.number}`);
-                    await octokit.rest.issues.addLabels({
-                        issue_number: pr.number,
-                        owner: repo_owner,
-                        repo: repo_name,
-                        labels: ["stale"]
-                    })
+                    // await octokit.rest.issues.addLabels({
+                    //     issue_number: pr.number,
+                    //     owner: repo_owner,
+                    //     repo: repo_name,
+                    //     labels: ["stale"]
+                    // })
                     stale.push(pr.number)
                 }
             }
