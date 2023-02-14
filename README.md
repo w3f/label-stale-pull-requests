@@ -9,3 +9,16 @@ This GitHub action puts the "stale" label to PRs that has been inactive for at l
 
 ## Outputs
 - `message`: the message that will be displayed in the action log.
+
+## Local development
+To test the action locally, create a `.env` file with
+```
+cp .env.example .env
+```
+and fill the `GITHUB_TOKEN` variable with a valid GitHub token (create one [here](https://github.com/settings/tokens)).
+
+Then run
+```
+node src/action.test.js
+```
+and you'll see the logs in the console. To see if the action is right, you should double check the PRs in the repo.

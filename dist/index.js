@@ -9673,10 +9673,24 @@ async function run() {
                 repo: repo_name,
                 per_page: results_per_page
             })).data;
+            let reviews = (await octokit.rest.pulls.listReviews({
+                owner: repo_owner,
+                repo: repo_name,
+                pull_number: pr.number,
+            })).data;
             if (comments.length) {
                 comments = comments.filter(comment => !(comment.user.login == "Polkadot-Forum" && comment.user.type == "Bot"));
                 let created_ats = comments.map(comment => comment.created_at);
                 latest_comment_date = created_ats.reduce((a, b) => a > b ? a : b);
+            }
+            if (reviews.length) {
+                let created_ats = reviews.map(review => review.submitted_at);
+                let latest_review_date = created_ats.reduce((a, b) => a > b ? a : b);
+                if (latest_comment_date) {
+                    latest_comment_date = latest_comment_date > latest_review_date ? latest_comment_date : latest_review_date;
+                } else {
+                    latest_comment_date = latest_review_date;
+                }
             }
             let deadline = new Date(latest_comment_date || pr.updated_at)
             deadline.setDate(deadline.getDate() + staleTimeout);
