@@ -9635,6 +9635,7 @@ async function run() {
     const octokit = _actions_github__WEBPACK_IMPORTED_MODULE_1__.getOctokit(token);
     const results_per_page = 100; // the max possible value
 
+    // here we get the list of open PRs, using pagination
     let current_page_openPRs = 0;
     let openPRs = [];
     let page = 1;
@@ -9658,6 +9659,7 @@ async function run() {
 
     const today = new Date();
 
+    // for every PR, we check if it is stale or to close
     for (const pr of openPRs) {
         const isToClose = pr.labels.filter(function (label) {
             return label.name === "to close"
@@ -9665,6 +9667,7 @@ async function run() {
         const isStale = pr.labels.filter(function (label) {
             return label.name === "stale"
         }).length > 0;
+        // if it's not to close, we find the latest comment or review_comment (GitHub diffrentiates them!)
         if (!isToClose) {
             let latest_comment_date = null;
             let comments = (await octokit.rest.issues.listComments({
@@ -9694,7 +9697,9 @@ async function run() {
             }
             let deadline = new Date(latest_comment_date || pr.updated_at)
             deadline.setDate(deadline.getDate() + staleTimeout);
+            // and check if the time passed from the older (review_)comment is more than the stale timeout
             if (today > deadline) {
+                // if the PR is already stale, we remove the "stale" label add the "to close" one
                 if (isStale) {
                     _actions_core__WEBPACK_IMPORTED_MODULE_0__.debug(`Adding "to close" label to PR #${pr.number}`);
                     await octokit.rest.issues.removeLabel({
@@ -9710,6 +9715,7 @@ async function run() {
                         labels: ["to close"]
                     })
                     to_close.push(pr.number)
+                // otherwise we just add the "stale" label
                 } else {
                     _actions_core__WEBPACK_IMPORTED_MODULE_0__.debug(`Adding "stale" label to PR #${pr.number}`);
                     await octokit.rest.issues.addLabels({
@@ -9724,6 +9730,7 @@ async function run() {
         }
     }
 
+    // here we build the message following the Matrix format [title](link) so title is clickable
     if (to_close.length || stale.length) {
         let to_close_message = ""
         if (to_close.length) {
