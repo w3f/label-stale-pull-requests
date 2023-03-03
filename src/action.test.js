@@ -5,31 +5,40 @@ import * as context from './context.applications.test.json' assert { type: "json
 import * as dotenv from 'dotenv';
 dotenv.config();
 
+async function getAllResultsFromPagination(octokitMethod, params) {
+    let current_page = 0;
+    let results = [];
+    let page = 1;
+    const results_per_page = 100; // the max possible value
+    do {
+        const data = (await octokitMethod({
+            ...params,
+            page: page++,
+            per_page: results_per_page
+        })).data;
+        results = results.concat(data);
+        current_page = data.length;
+    } while (current_page === results_per_page)
+    return results;
+}
+
 async function run() {
-    const staleTimeout = parseInt(core.getInput('stale-timeout'));
+    const staleTimeout = 14;
     const context_json = context.default;
     const repo = context_json.repository;
     const repo_owner = repo.split("/")[0];
     const repo_name = repo.split("/")[1];
     const token = process.env.GITHUB_TOKEN;
     const octokit = github.getOctokit(token);
-    const results_per_page = 100; // the max possible value
 
-    let current_page_openPRs = 0;
-    let openPRs = [];
-    let page = 1;
-    do {
-        const openPRs_raw = await octokit.rest.pulls.list({
+    let openPRs = await getAllResultsFromPagination(
+        octokit.rest.pulls.list, 
+        {
             owner: repo_owner,
             repo: repo_name,
-            state: 'open',
-            page: page++,
-            per_page: results_per_page
-        });
-        const openPRs_data = openPRs_raw.data;
-        openPRs = openPRs.concat(openPRs_data);
-        current_page_openPRs = openPRs_data.length;
-    } while (current_page_openPRs === results_per_page)
+            state: 'open'
+        }
+    );
 
     core.debug(`Found ${openPRs.length} open PRs`);
 
@@ -46,35 +55,22 @@ async function run() {
             return label.name === "stale"
         }).length > 0;
         if (true) {
-            let latest_comment_date = null;
-            let comments = (await octokit.rest.issues.listComments({
-                issue_number: pr.number,
-                owner: repo_owner,
-                repo: repo_name,
-                per_page: results_per_page
-            })).data;
-            let reviews = (await octokit.rest.pulls.listReviews({
-                owner: repo_owner,
-                repo: repo_name,
-                pull_number: pr.number,
-            })).data;
-            if (comments.length) {
-                comments = comments.filter(comment => !(comment.user.login == "Polkadot-Forum" && comment.user.type == "Bot"));
-                let created_ats = comments.map(comment => comment.created_at);
-                latest_comment_date = created_ats.reduce((a, b) => a > b ? a : b);
-            }
-            if (reviews.length) {
-                let created_ats = reviews.map(review => review.submitted_at);
-                let latest_review_date = created_ats.reduce((a, b) => a > b ? a : b);
-                if (latest_comment_date) {
-                    latest_comment_date = latest_comment_date > latest_review_date ? latest_comment_date : latest_review_date;
-                } else {
-                    latest_comment_date = latest_review_date;
+            let events = await getAllResultsFromPagination(
+                octokit.rest.issues.listEventsForTimeline, 
+                {
+                    issue_number: pr.number,
+                    owner: repo_owner,
+                    repo: repo_name
                 }
+            );
+            // take last event, and if it's a comment made from the Polkadot-Forum bot, take the one before
+            let last_event = events[events.length - 1];
+            if (last_event.event == "commented" && last_event.actor.login == "Polkadot-Forum") {
+                last_event = events[events.length - 2];
             }
-            let deadline = new Date(latest_comment_date || pr.updated_at)
-            console.log("PR #" + pr.number + " latest event: " + deadline);
+            let deadline = new Date(last_event.created_at || last_event.submitted_at)
             deadline.setDate(deadline.getDate() + staleTimeout);
+            console.log(`PR #${pr.number} last event: ${last_event.event} on ${last_event.created_at || last_event.submitted_at} (deadline: ${deadline})`)
             if (false) {
                 if (isStale) {
                     core.debug(`Adding "to close" label to PR #${pr.number}`);

@@ -9624,6 +9624,24 @@ var __webpack_exports__ = {};
 
 
 
+async function getAllResultsFromPagination(octokitMethod, params) {
+    let current_page_results = 0;
+    let results = [];
+    let page = 1;
+    const results_per_page = 100; // the max possible value
+    do {
+        const data = (await octokitMethod({
+            ...params,
+            page: page++,
+            per_page: results_per_page
+        })).data;
+        results = results.concat(data);
+        current_page_results = data.length;
+    // if current_page_results is less than results_per_page, we reached the last page
+    } while (current_page_results === results_per_page)
+    return results;
+}
+
 async function run() {
     const staleTimeout = parseInt(_actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('stale-timeout'));
     const context = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('context');
@@ -9633,24 +9651,15 @@ async function run() {
     const repo_name = repo.split("/")[1];
     const token = _actions_core__WEBPACK_IMPORTED_MODULE_0__.getInput('token');
     const octokit = _actions_github__WEBPACK_IMPORTED_MODULE_1__.getOctokit(token);
-    const results_per_page = 100; // the max possible value
 
-    // here we get the list of open PRs, using pagination
-    let current_page_openPRs = 0;
-    let openPRs = [];
-    let page = 1;
-    do {
-        const openPRs_raw = await octokit.rest.pulls.list({
+    let openPRs = await getAllResultsFromPagination(
+        octokit.rest.pulls.list, 
+        {
             owner: repo_owner,
             repo: repo_name,
-            state: 'open',
-            page: page++,
-            per_page: results_per_page
-        });
-        const openPRs_data = openPRs_raw.data;
-        openPRs = openPRs.concat(openPRs_data);
-        current_page_openPRs = openPRs_data.length;
-    } while (current_page_openPRs === results_per_page)
+            state: 'open'
+        }
+    );
 
     _actions_core__WEBPACK_IMPORTED_MODULE_0__.debug(`Found ${openPRs.length} open PRs`);
 
@@ -9667,37 +9676,23 @@ async function run() {
         const isStale = pr.labels.filter(function (label) {
             return label.name === "stale"
         }).length > 0;
-        // if it's not to close, we find the latest comment or review_comment (GitHub diffrentiates them!)
+        // if it's not to close, we find the latest (considerable) event, then set the deadline
         if (!isToClose) {
-            let latest_comment_date = null;
-            let comments = (await octokit.rest.issues.listComments({
-                issue_number: pr.number,
-                owner: repo_owner,
-                repo: repo_name,
-                per_page: results_per_page
-            })).data;
-            let reviews = (await octokit.rest.pulls.listReviews({
-                owner: repo_owner,
-                repo: repo_name,
-                pull_number: pr.number,
-            })).data;
-            if (comments.length) {
-                comments = comments.filter(comment => !(comment.user.login == "Polkadot-Forum" && comment.user.type == "Bot"));
-                let created_ats = comments.map(comment => comment.created_at);
-                latest_comment_date = created_ats.reduce((a, b) => a > b ? a : b);
-            }
-            if (reviews.length) {
-                let created_ats = reviews.map(review => review.submitted_at);
-                let latest_review_date = created_ats.reduce((a, b) => a > b ? a : b);
-                if (latest_comment_date) {
-                    latest_comment_date = latest_comment_date > latest_review_date ? latest_comment_date : latest_review_date;
-                } else {
-                    latest_comment_date = latest_review_date;
+            let events = await getAllResultsFromPagination(
+                octokit.rest.issues.listEventsForTimeline, 
+                {
+                    issue_number: pr.number,
+                    owner: repo_owner,
+                    repo: repo_name
                 }
+            );
+            let last_event = events[events.length - 1];
+            if (last_event.event == "commented" && last_event.actor.login == "Polkadot-Forum") {
+                last_event = events[events.length - 2];
             }
-            let deadline = new Date(latest_comment_date || pr.updated_at)
+            let deadline = new Date(last_event.created_at || last_event.submitted_at)
             deadline.setDate(deadline.getDate() + staleTimeout);
-            // and check if the time passed from the older (review_)comment is more than the stale timeout
+            // and check if the time passed from the latest event is more than the stale timeout
             if (today > deadline) {
                 // if the PR is already stale, we remove the "stale" label add the "to close" one
                 if (isStale) {
